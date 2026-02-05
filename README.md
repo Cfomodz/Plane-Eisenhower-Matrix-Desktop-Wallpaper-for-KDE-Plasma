@@ -16,7 +16,13 @@
 - **Q1 — Do it now:** High value, low effort  
 - **Q2 — Do it next:** High value, high effort  
 - **Q3 — Do it if/when there is time:** Low value, low effort  
-- **Q4 — Don't do it:** Low value, high effort  
+- **Q4 — Don't do it:** Low value, high effort
+
+<div align="center">
+
+<img width="1000" src="https://github.com/user-attachments/assets/b9e5eba9-6c8f-40e0-ba4e-d9df9fc44df8" />
+
+</div>
 
 Works with self-hosted Plane and Plane Cloud.
 
