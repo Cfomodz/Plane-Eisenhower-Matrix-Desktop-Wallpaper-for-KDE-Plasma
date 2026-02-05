@@ -1,6 +1,17 @@
+<div align="center">
+
 # Plane Eisenhower Matrix Desktop Wallpaper for KDE Plasma
 
-Generate a KDE Plasma wallpaper from your [Plane](https://plane.so) project: issues are placed on an Eisenhower matrix (Value vs Effort) by **status**, and the image is set as your desktop background.
+![GitHub License](https://img.shields.io/github/license/Cfomodz/parallax-studio-pro)
+![GitHub Sponsors](https://img.shields.io/github/sponsors/Cfomodz)
+![Discord](https://img.shields.io/discord/425182625032962049)
+[![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
+
+<img src="https://github.com/user-attachments/assets/36973ddd-0b1f-4013-a367-9056c4299a68" alt="matrix icon" width="300"/>
+
+</div>
+
+#### Generate a KDE Plasma wallpaper from your [Plane](https://plane.so) project: issues are placed on an Eisenhower matrix (Value vs Effort) by **status**, and the image is set as your desktop background.
 
 - **Q1 — Do it now:** High value, low effort  
 - **Q2 — Do it next:** High value, high effort  
