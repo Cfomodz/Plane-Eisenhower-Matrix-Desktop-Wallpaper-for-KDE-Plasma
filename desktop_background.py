@@ -3,7 +3,9 @@ import json
 import subprocess
 import os
 import re
+import sys
 import time
+import platform
 from urllib.parse import urlparse
 from PIL import Image, ImageDraw, ImageFont
 import textwrap
@@ -77,6 +79,13 @@ def _plane_config_from_env():
 
 _plane_base, _plane_key, _plane_workspace, _plane_project = _plane_config_from_env()
 
+def _default_font_path(bold=False):
+    """Return a sensible default font path for the current platform."""
+    if platform.system() == "Windows":
+        base = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts")
+        return os.path.join(base, "segoeui" + ("b" if bold else "") + ".ttf")
+    return "/usr/share/fonts/noto/NotoSans-" + ("Bold" if bold else "Regular") + ".ttf"
+
 CONFIG = {
     # PLANE API (from .env: PLANE_PROJECT_URL + PLANE_API_KEY, or separate vars)
     "PLANE_BASE_URL": _plane_base,
@@ -87,8 +96,8 @@ CONFIG = {
     # OUTPUT & DISPLAY
     "OUTPUT_PATH": _env("PLANE_MATRIX_OUTPUT_PATH") or os.path.expanduser("~/Pictures/plane_matrix_wallpaper.png"),
     "RESOLUTION": _resolution(),
-    "FONT_PATH": _env("PLANE_MATRIX_FONT_PATH", "/usr/share/fonts/noto/NotoSans-Regular.ttf"),
-    "FONT_BOLD_PATH": _env("PLANE_MATRIX_FONT_BOLD_PATH", "/usr/share/fonts/noto/NotoSans-Bold.ttf"),
+    "FONT_PATH": _env("PLANE_MATRIX_FONT_PATH", _default_font_path(bold=False)),
+    "FONT_BOLD_PATH": _env("PLANE_MATRIX_FONT_BOLD_PATH", _default_font_path(bold=True)),
 
     # VISUAL SETTINGS
     "NOTE_SIZE": (200, 200),
@@ -365,18 +374,40 @@ def generate_wallpaper(issues):
     print(f"Wallpaper generated at: {CONFIG['OUTPUT_PATH']}")
 
 # ==========================================
-# PLASMA INTEGRATION
+# WALLPAPER INTEGRATION (cross-platform)
 # ==========================================
+def set_windows_wallpaper(image_path):
+    """
+    Sets the desktop wallpaper on Windows 10/11 using the Win32 API.
+    The image must be a BMP for the legacy API, but SystemParametersInfoW
+    with SPI_SETDESKWALLPAPER handles JPG/PNG natively on modern Windows.
+    """
+    abs_path = os.path.abspath(image_path)
+    try:
+        import ctypes
+        SPI_SETDESKWALLPAPER = 0x0014
+        SPIF_UPDATEINIFILE = 0x01
+        SPIF_SENDWININICHANGE = 0x02
+        result = ctypes.windll.user32.SystemParametersInfoW(
+            SPI_SETDESKWALLPAPER, 0, abs_path,
+            SPIF_UPDATEINIFILE | SPIF_SENDWININICHANGE,
+        )
+        if result:
+            print("Wallpaper updated successfully.")
+        else:
+            print("SystemParametersInfoW returned failure. Check the image path and format.")
+    except Exception as e:
+        print(f"Failed to set wallpaper on Windows: {e}")
+
+
 def set_plasma_wallpaper(image_path):
     """
     Sets the wallpaper on KDE Plasma (5/6) using DBus.
     Clears the image first so Plasma reloads from disk (avoids showing cached old image).
     """
-    # Use absolute path so Plasma resolves the same file we wrote
     abs_path = os.path.abspath(image_path)
     uri = "file://" + abs_path
 
-    # Clear then set so Plasma reloads the image instead of using cache
     jscript_clear = """
     var allDesktops = desktops();
     for (i=0; i<allDesktops.length; i++) {
@@ -415,6 +446,14 @@ def set_plasma_wallpaper(image_path):
     else:
         print("Failed to set wallpaper. Ensure KDE Plasma is running and qdbus is installed.")
 
+
+def set_wallpaper(image_path):
+    """Auto-detect platform and set the wallpaper accordingly."""
+    if platform.system() == "Windows":
+        set_windows_wallpaper(image_path)
+    else:
+        set_plasma_wallpaper(image_path)
+
 # ==========================================
 # MAIN
 # ==========================================
@@ -436,4 +475,4 @@ if __name__ == "__main__":
 
     print(f"Processing {len(issues)} issues...")
     generate_wallpaper(issues)
-    set_plasma_wallpaper(CONFIG['OUTPUT_PATH'])
+    set_wallpaper(CONFIG['OUTPUT_PATH'])
