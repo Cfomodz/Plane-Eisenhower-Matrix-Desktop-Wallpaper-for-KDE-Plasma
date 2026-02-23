@@ -81,9 +81,16 @@ _plane_base, _plane_key, _plane_workspace, _plane_project = _plane_config_from_e
 
 def _default_font_path(bold=False):
     """Return a sensible default font path for the current platform."""
-    if platform.system() == "Windows":
+    system = platform.system()
+    if system == "Windows":
         base = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts")
         return os.path.join(base, "segoeui" + ("b" if bold else "") + ".ttf")
+    if system == "Darwin":
+        name = "SFNS" + ("Bold" if bold else "Regular") + ".ttf"
+        sf_path = os.path.join("/System/Library/Fonts", name)
+        if os.path.isfile(sf_path):
+            return sf_path
+        return "/System/Library/Fonts/Helvetica.ttc"
     return "/usr/share/fonts/noto/NotoSans-" + ("Bold" if bold else "Regular") + ".ttf"
 
 CONFIG = {
@@ -377,11 +384,7 @@ def generate_wallpaper(issues):
 # WALLPAPER INTEGRATION (cross-platform)
 # ==========================================
 def set_windows_wallpaper(image_path):
-    """
-    Sets the desktop wallpaper on Windows 10/11 using the Win32 API.
-    The image must be a BMP for the legacy API, but SystemParametersInfoW
-    with SPI_SETDESKWALLPAPER handles JPG/PNG natively on modern Windows.
-    """
+    """Sets the desktop wallpaper on Windows 10/11 using the Win32 API."""
     abs_path = os.path.abspath(image_path)
     try:
         import ctypes
@@ -400,11 +403,48 @@ def set_windows_wallpaper(image_path):
         print(f"Failed to set wallpaper on Windows: {e}")
 
 
+def set_macos_wallpaper(image_path):
+    """Sets the desktop wallpaper on macOS using osascript (AppleScript)."""
+    abs_path = os.path.abspath(image_path)
+    script = f'''
+    tell application "System Events"
+        tell every desktop
+            set picture to POSIX file "{abs_path}"
+        end tell
+    end tell
+    '''
+    try:
+        subprocess.run(["osascript", "-e", script], check=True, capture_output=True)
+        print("Wallpaper updated successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to set wallpaper via osascript: {e.stderr.decode().strip()}")
+    except FileNotFoundError:
+        print("osascript not found. Are you running macOS?")
+
+
+def set_gnome_wallpaper(image_path):
+    """Sets the desktop wallpaper on GNOME (Ubuntu, Fedora Workstation, etc.) via gsettings."""
+    abs_path = os.path.abspath(image_path)
+    uri = "file://" + abs_path
+    try:
+        subprocess.run(
+            ["gsettings", "set", "org.gnome.desktop.background", "picture-uri", uri],
+            check=True, capture_output=True,
+        )
+        # GNOME 42+ uses a separate key for dark-mode wallpaper
+        subprocess.run(
+            ["gsettings", "set", "org.gnome.desktop.background", "picture-uri-dark", uri],
+            capture_output=True,
+        )
+        print("Wallpaper updated successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"gsettings failed: {e.stderr.decode().strip()}")
+    except FileNotFoundError:
+        print("gsettings not found. Is GNOME installed?")
+
+
 def set_plasma_wallpaper(image_path):
-    """
-    Sets the wallpaper on KDE Plasma (5/6) using DBus.
-    Clears the image first so Plasma reloads from disk (avoids showing cached old image).
-    """
+    """Sets the wallpaper on KDE Plasma (5/6) using DBus."""
     abs_path = os.path.abspath(image_path)
     uri = "file://" + abs_path
 
@@ -432,7 +472,7 @@ def set_plasma_wallpaper(image_path):
             try:
                 subprocess.run(
                     [qdbus, "org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", script],
-                    check=True, capture_output=True
+                    check=True, capture_output=True,
                 )
                 return True
             except (subprocess.CalledProcessError, FileNotFoundError):
@@ -447,12 +487,36 @@ def set_plasma_wallpaper(image_path):
         print("Failed to set wallpaper. Ensure KDE Plasma is running and qdbus is installed.")
 
 
+def _detect_linux_desktop():
+    """Best-effort detection of the running Linux desktop environment."""
+    desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
+    session = os.environ.get("DESKTOP_SESSION", "").lower()
+    if "kde" in desktop or "plasma" in session:
+        return "kde"
+    if "gnome" in desktop or "unity" in desktop or "gnome" in session:
+        return "gnome"
+    return None
+
+
 def set_wallpaper(image_path):
     """Auto-detect platform and set the wallpaper accordingly."""
-    if platform.system() == "Windows":
+    system = platform.system()
+    if system == "Windows":
         set_windows_wallpaper(image_path)
-    else:
+        return
+    if system == "Darwin":
+        set_macos_wallpaper(image_path)
+        return
+    # Linux / BSD — try to detect the desktop environment
+    de = _detect_linux_desktop()
+    if de == "kde":
         set_plasma_wallpaper(image_path)
+    elif de == "gnome":
+        set_gnome_wallpaper(image_path)
+    else:
+        print(f"Desktop environment not detected (XDG_CURRENT_DESKTOP={os.environ.get('XDG_CURRENT_DESKTOP', '')!r}).")
+        print(f"Wallpaper image saved to: {os.path.abspath(image_path)}")
+        print("Set it manually in your desktop settings.")
 
 # ==========================================
 # MAIN
