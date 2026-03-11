@@ -39,6 +39,9 @@ env/
 *.swo
 *~
 
+# Microsoft token cache
+.ms_token_cache.bin
+
 # OS
 .DS_Store
 Thumbs.db
