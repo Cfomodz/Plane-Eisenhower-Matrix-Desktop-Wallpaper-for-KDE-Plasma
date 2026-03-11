@@ -1,38 +1,28 @@
 # install-task.ps1 — Register a Windows Task Scheduler job to refresh the wallpaper.
-# Usage (from repo directory, in PowerShell):
-#   .\install-task.ps1                  # every 30 minutes (default)
+# No admin required. Usage (from repo directory, in PowerShell):
+#   .\install-task.ps1                     # every 30 minutes (default)
 #   .\install-task.ps1 -IntervalMinutes 15
 
 param(
     [int]$IntervalMinutes = 30
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
 
 if ($IntervalMinutes -lt 1) {
-    Write-Host "Interval must be >= 1 minute."
+    Write-Host 'Interval must be >= 1 minute.'
     exit 1
 }
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$PythonScript = Join-Path $ScriptDir "desktop_background.py"
+$MainScript = Join-Path $ScriptDir 'eisenhower-wallpaper.ps1'
 
-if (-not (Test-Path $PythonScript)) {
-    Write-Host "Error: desktop_background.py not found in $ScriptDir"
+if (-not (Test-Path $MainScript)) {
+    Write-Host "Error: eisenhower-wallpaper.ps1 not found in $ScriptDir"
     exit 1
 }
 
-$TaskName = "TodoEisenhowerMatrixWallpaper"
-
-# Find python
-$Python = (Get-Command python -ErrorAction SilentlyContinue).Source
-if (-not $Python) {
-    $Python = (Get-Command python3 -ErrorAction SilentlyContinue).Source
-}
-if (-not $Python) {
-    Write-Host "Error: python not found in PATH."
-    exit 1
-}
+$TaskName = 'TodoEisenhowerMatrixWallpaper'
 
 # Remove existing task if present
 $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
@@ -41,10 +31,10 @@ if ($existing) {
     Write-Host "Removed existing task '$TaskName'."
 }
 
-# Create the scheduled task
+# Create the scheduled task (runs as current user, no elevation)
 $Action = New-ScheduledTaskAction `
-    -Execute $Python `
-    -Argument "`"$PythonScript`"" `
+    -Execute 'powershell.exe' `
+    -Argument "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$MainScript`"" `
     -WorkingDirectory $ScriptDir
 
 $Trigger = New-ScheduledTaskTrigger `
@@ -69,6 +59,6 @@ Register-ScheduledTask `
     -Principal $Principal `
     -Description "Refresh Eisenhower Matrix wallpaper from Microsoft To Do every $IntervalMinutes minute(s)."
 
-Write-Host ""
+Write-Host ''
 Write-Host "Scheduled task '$TaskName' created: runs every $IntervalMinutes minute(s)."
 Write-Host "To remove: Unregister-ScheduledTask -TaskName '$TaskName'"
